@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: sudoku-arena
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /healthz
+    envVars:
+      - key: REDIS_URL
+        sync: false   # dán chuỗi rediss://default:<password>@<host>:6379 từ Upstash
