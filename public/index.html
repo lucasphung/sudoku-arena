@@ -1,0 +1,95 @@
+<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sudoku Arena</title>
+<style>
+:root{--bg:#f4f5fa;--c:#fff;--t:#1f2430;--m:#6b7280;--p:#4f46e5;--b:#c7cbd6;--r:#dc2626;--h:#e0e7ff}
+@media(prefers-color-scheme:dark){:root{--bg:#12141a;--c:#1c1f28;--t:#e8eaf0;--m:#9aa3b2;--p:#818cf8;--b:#454b5c;--r:#f87171;--h:#2b3050}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:16px system-ui,sans-serif;display:flex;justify-content:center}
+main{width:100%;max-width:480px;padding:16px}h1{font-size:22px;margin:8px 0}h2{font-size:17px;margin:16px 0 8px}
+.card{background:var(--c);border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px #0002}
+input,select,button{font:inherit;padding:10px 12px;border-radius:8px;border:1px solid var(--b);background:var(--c);color:var(--t);width:100%;margin:4px 0}
+button{background:var(--p);color:#fff;border:0;cursor:pointer}button.s{background:var(--c);color:var(--t);border:1px solid var(--b)}
+.row{display:flex;gap:8px}.row>*{flex:1}.m{color:var(--m);font-size:14px}.err{color:var(--r)}
+#grid{display:grid;grid-template-columns:repeat(9,1fr);border:2px solid var(--t);margin:8px 0;aspect-ratio:1;user-select:none}
+#grid div{display:flex;align-items:center;justify-content:center;font-size:clamp(16px,5vw,24px);border:1px solid var(--b);cursor:pointer;color:var(--p)}
+#grid div.g{color:var(--t);font-weight:700}#grid div.sel{background:var(--p);color:#fff}#grid div.hl{background:var(--h)}#grid div.bad{color:var(--r)}
+#grid div:nth-child(3n){border-right:2px solid var(--t)}#grid div:nth-child(9n){border-right:1px solid var(--b)}
+#grid div:nth-child(n+19):nth-child(-n+27),#grid div:nth-child(n+46):nth-child(-n+54){border-bottom:2px solid var(--t)}
+#pad{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}#pad button{padding:12px 0}
+li{margin:4px 0}table{width:100%;border-collapse:collapse}td{padding:6px 4px;border-bottom:1px solid var(--b)}td:last-child{text-align:right;font-weight:700}
+.bar{height:8px;background:var(--b);border-radius:4px;overflow:hidden}.bar i{display:block;height:100%;background:var(--p)}
+</style></head><body><main>
+<h1>🧩 Sudoku Arena</h1>
+
+<section id="auth" class="card"><input id="u" placeholder="Tên đăng nhập" autocomplete="username"><input id="p" type="password" placeholder="Mật khẩu" autocomplete="current-password">
+<div class="row"><button onclick="doAuth(0)">Đăng nhập</button><button class="s" onclick="doAuth(1)">Đăng ký</button></div><div id="aerr" class="err"></div></section>
+
+<section id="lobby" hidden>
+<div class="card"><b id="who"></b><div class="m" id="stat"></div><div class="row"><button class="s" onclick="board()">🏆 Bảng xếp hạng</button><button class="s" onclick="logout()">Thoát</button></div></div>
+<div class="card"><h2>Thi một mình</h2><div class="row"><button onclick="solo('easy')">Dễ</button><button onclick="solo('medium')">Vừa</button><button onclick="solo('hard')">Khó</button></div></div>
+<div class="card"><h2>Tạo phòng</h2><div class="row"><select id="rm"><option value="duel">Đối kháng 1v1</option><option value="team">Thi theo nhóm (A/B)</option></select>
+<select id="rd"><option value="easy">Dễ</option><option value="medium" selected>Vừa</option><option value="hard">Khó</option></select></div><button onclick="ws_({type:'create',mode:rm.value,diff:rd.value})">Tạo phòng</button>
+<h2>Vào phòng</h2><div class="row"><input id="rc" placeholder="Mã phòng" maxlength="5" style="text-transform:uppercase"><button onclick="ws_({type:'join',code:rc.value})">Vào</button></div></div>
+<div class="card"><h2>Kết quả gần đây</h2><ul id="hist" class="m" style="padding-left:18px;margin:0"></ul></div></section>
+
+<section id="room" class="card" hidden><h2>Phòng <b id="rcode"></b></h2><div class="m" id="rinfo"></div><div id="plist"></div>
+<div id="tsw" class="row"><button class="s" onclick="ws_({type:'side',side:'A'})">Vào đội A</button><button class="s" onclick="ws_({type:'side',side:'B'})">Vào đội B</button></div>
+<button id="bstart" onclick="ws_({type:'start'})">Bắt đầu</button><button class="s" onclick="quit()">Rời phòng</button></section>
+
+<section id="game" hidden><div class="card"><div class="row"><b id="gt"></b><b id="time" style="text-align:right">00:00</b></div><div id="prog"></div>
+<div id="grid"></div><div id="pad"></div><div id="msg" style="margin-top:8px"></div>
+<div class="row" style="margin-top:8px"><button id="bsub" onclick="submit()">Nộp bài</button><button class="s" onclick="quit()">Thoát</button></div></div></section>
+
+<section id="lb" class="card" hidden><h2>🏆 Bảng xếp hạng</h2><div class="row"><button class="s" onclick="board('points')">Điểm</button><button class="s" onclick="board('easy')">Dễ ⏱</button><button class="s" onclick="board('medium')">Vừa ⏱</button><button class="s" onclick="board('hard')">Khó ⏱</button></div>
+<table id="lbt"></table><button class="s" onclick="enter()">Quay lại</button></section>
+</main>
+<script>
+const $=s=>document.querySelector(s),NAME={easy:'Dễ',medium:'Vừa',hard:'Khó',solo:'Solo',duel:'Đối kháng',team:'Nhóm'};
+let token=localStorage.t,ws,G,tick,room,sideProg={};
+const fmt=s=>String(s/60|0).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+async function api(p,b){const r=await fetch('/api/'+p,{method:b?'POST':'GET',headers:{'content-type':'application/json','x-token':token||''},body:b?JSON.stringify(b):undefined});
+  const j=await r.json();if(!r.ok){if(r.status===401&&token&&p!=='login')logout();throw new Error(j.error||'Lỗi')}return j}
+const show=id=>document.querySelectorAll('section').forEach(s=>s.hidden=s.id!==id);
+async function doAuth(reg){try{const j=await api(reg?'register':'login',{u:u.value,p:p.value});token=localStorage.t=j.token;enter()}catch(e){$('#aerr').textContent=e.message}}
+function logout(){localStorage.removeItem('t');token=null;ws&&ws.close();ws=null;show('auth')}
+async function enter(){clearInterval(tick);G=null;try{const j=await api('me');
+  $('#who').textContent=`${j.user} · ${j.points} điểm · hạng ${j.rank??'-'}`;$('#stat').textContent=`${j.games} trận · ${j.wins} thắng`;
+  $('#hist').innerHTML=j.hist.map(h=>`<li>${NAME[h.mode]} ${NAME[h.diff]} — ${h.win?'Thắng':'Thua'}, ${fmt(h.secs)} (+${h.pts})</li>`).join('')||'<li>Chưa có ván nào</li>';
+  connect();show('lobby')}catch(e){show('auth')}}
+async function board(t='points'){show('lb');const l=await api('leaderboard?type='+t);
+  $('#lbt').innerHTML=l.map((x,i)=>`<tr><td>${i+1}</td><td>${x.user}</td><td>${t==='points'?x.score+' đ':fmt(x.score)}</td></tr>`).join('')||'<tr><td>Chưa có dữ liệu</td></tr>'}
+/* WebSocket */
+function connect(){if(ws&&ws.readyState<2)return;ws=new WebSocket((location.protocol==='https:'?'wss':'ws')+'://'+location.host+'/ws?token='+token);
+  ws.onmessage=e=>onMsg(JSON.parse(e.data));ws.onclose=()=>{if(token)setTimeout(connect,2000)}}
+const ws_=m=>ws&&ws.readyState===1?ws.send(JSON.stringify(m)):alert('Đang kết nối, thử lại sau giây lát');
+function onMsg(m){
+  if(m.type==='err')alert(m.msg);
+  else if(m.type==='room'){room=m;if(G&&G.playing){drawProg();return}renderRoom()}
+  else if(m.type==='start'){G={mode:room.mode,puzzle:m.puzzle,board:m.board,sel:-1,playing:true,side:m.side};beginGame(`${NAME[room.mode]} · ${NAME[room.diff]}${room.mode==='team'?' · Đội '+m.side:''}`)}
+  else if(m.type==='board'){G.board=m.board;draw()}
+  else if(m.type==='progress'){sideProg=m;drawProg()}
+  else if(m.type==='end'){G.playing=false;clearInterval(tick);const me=m.results.find(r=>r.user===$('#who').textContent.split(' · ')[0]);
+    $('#msg').innerHTML=`<b>${m.winner===G.side?'🎉 Chiến thắng!':'Thua cuộc'}</b>${m.forfeit?' (đối thủ rời trận)':''} — ${fmt(m.secs)}<br>`+m.results.map(r=>`${r.win?'🏆':'•'} ${r.user}${room.mode==='team'?' ('+r.side+')':''}: +${r.pts}`).join('<br>');
+    $('#bsub').hidden=true;$('#pad').hidden=true}}
+function renderRoom(){show('room');$('#rcode').textContent=room.code;$('#rinfo').textContent=`${NAME[room.mode]} · ${NAME[room.diff]} — chia sẻ mã này cho bạn bè`;
+  $('#plist').innerHTML='<ul>'+room.players.map(p=>`<li>${p.user}${room.mode==='team'?' — Đội '+p.side:''}${p.user===room.host?' 👑':''}</li>`).join('')+'</ul>';
+  $('#tsw').hidden=room.mode!=='team';const h=room.host===$('#who').textContent.split(' · ')[0];$('#bstart').hidden=!h}
+function quit(){if(G&&G.mode!=='solo'||room&&!G)ws_({type:'leave'});room=null;enter()}
+/* Game */
+async function solo(d){try{const j=await api('solo/start',{diff:d});G={mode:'solo',id:j.id,puzzle:j.puzzle,board:[...j.puzzle],sel:-1,playing:true};sideProg={};beginGame('Solo · '+NAME[d])}catch(e){alert(e.message)}}
+function beginGame(t){show('game');$('#gt').textContent=t;$('#msg').textContent='';$('#bsub').hidden=G.mode!=='solo';$('#pad').hidden=false;
+  $('#pad').innerHTML=[1,2,3,4,5,6,7,8,9].map(n=>`<button class="s" onclick="setVal(${n})">${n}</button>`).join('')+'<button class="s" onclick="setVal(0)">⌫</button>';
+  const t0=Date.now();clearInterval(tick);tick=setInterval(()=>$('#time').textContent=fmt((Date.now()-t0)/1000|0),500);$('#time').textContent='00:00';draw();drawProg()}
+function bad(i){const v=G.board[i];if(!v)return false;const r=i/9|0,c=i%9;for(let k=0;k<81;k++){if(k===i||G.board[k]!==v)continue;
+  if((k/9|0)===r||k%9===c||((k/9|0)/3|0)===(r/3|0)&&(k%9/3|0)===(c/3|0))return true}return false}
+function draw(){const sv=G.sel>=0?G.board[G.sel]:0;$('#grid').innerHTML=G.board.map((v,i)=>`<div class="${G.puzzle[i]?'g ':''}${i===G.sel?'sel ':sv&&v===sv?'hl ':''}${bad(i)?'bad':''}" onclick="G.sel=${i};draw()">${v||''}</div>`).join('')}
+function drawProg(){if(!G||G.mode==='solo'||!sideProg.sides)return;
+  $('#prog').innerHTML=Object.entries(sideProg.sides).map(([s,n])=>{const nm=G.mode==='team'?'Đội '+s:s;return`<div class="m">${nm}${s===G.side?' (bạn)':''}: ${n}/${sideProg.total}</div><div class="bar"><i style="width:${n/sideProg.total*100}%"></i></div>`}).join('')}
+function setVal(v){if(!G||!G.playing||G.sel<0||G.puzzle[G.sel])return;G.board[G.sel]=v;draw();
+  if(G.mode==='solo'){if(!G.board.includes(0))submit()}else ws_({type:'move',i:G.sel,v})}
+async function submit(){if(G.board.includes(0))return $('#msg').textContent='Bạn chưa điền hết các ô';
+  try{const j=await api('solo/submit',{id:G.id,grid:G.board});if(!j.ok)return $('#msg').innerHTML='<span class="err">Chưa chính xác, hãy kiểm tra lại.</span>';
+    G.playing=false;clearInterval(tick);$('#bsub').hidden=true;$('#pad').hidden=true;$('#msg').innerHTML=`<b>🎉 Hoàn thành!</b> ${fmt(j.secs)} — +${j.pts} điểm`}catch(e){alert(e.message)}}
+addEventListener('keydown',e=>{if(!G||!G.playing||$('#game').hidden)return;
+  if(/^[0-9]$/.test(e.key))setVal(+e.key);else if(e.key==='Backspace'||e.key==='Delete')setVal(0);
+  else{const d={ArrowUp:-9,ArrowDown:9,ArrowLeft:-1,ArrowRight:1}[e.key];if(d){const n=(G.sel<0?0:G.sel)+d;if(n>=0&&n<81){G.sel=n;draw()}e.preventDefault()}}});
+token?enter():show('auth');
+</script></body></html>
